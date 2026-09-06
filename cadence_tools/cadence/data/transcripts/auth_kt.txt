@@ -1,0 +1,53 @@
+KNOWLEDGE TRANSFER SESSION - HELIX AUTH SERVICE
+Recorded: 2026-09-02, 10:00-10:40
+Participants: Devika Suresh (outgoing owner), Kiran Rao (incoming owner)
+Source: CAL-115 / TR-001
+[Synthetic transcript created for demonstration purposes.]
+
+[00:00] DEVIKA: Right, so this is the handover for the Helix auth service. I'll go through the refresh path, the session layout, the deploy config, and then a few things I honestly don't have answers for.
+
+[00:42] DEVIKA: The shape of it is client, API gateway, auth service, then Auroria as the identity provider. The gateway does no token validation at all. That surprises people. Everything lands on the auth service.
+
+[01:30] KIRAN: So the gateway is a pure router as far as auth is concerned.
+
+[01:35] DEVIKA: Correct. There was a proposal to push validation into the gateway last year and it was dropped because the gateway team didn't want to own key rotation.
+
+[02:50] DEVIKA: Access tokens live for fifteen minutes. Refresh tokens currently live for ninety days, and that ninety is the thing that's about to break. Auroria is dropping the maximum to fourteen days on the eighteenth.
+
+[03:40] DEVIKA: Which means we need refresh-token rotation. We don't have it today. Right now a refresh token is a long-lived bearer credential and we just keep handing the same one back. With rotation, every time a client redeems a refresh token, it gets a new one and the old one is invalidated immediately.
+
+[04:55] KIRAN: And if an old one gets replayed?
+
+[05:00] DEVIKA: That's the interesting part, and it's the reason rotation is worth doing beyond just compliance. If a rotated token gets replayed, that's a strong signal the token was stolen, because the legitimate client would already have moved on to the new one. The standard response is reuse detection - you invalidate the entire token family for that session and force re-authentication. We have none of that today.
+
+[06:30] DEVIKA: Session state is in Redis. That was ADR-014 back in August. Postgres was measured at 34ms p99 under projected peak and Redis was 3ms, so Redis won on read latency.
+
+[07:15] DEVIKA: The key layout is session colon user id colon device id. TTL is set to match the refresh token lifetime, which is why the fourteen day change touches the session layer too and not just the token issuance code. People miss that.
+
+[08:40] KIRAN: So changing the token lifetime silently changes our Redis memory profile.
+
+[08:47] DEVIKA: Exactly. Shorter TTL, keys expire faster, memory pressure drops but eviction churn goes up. There's a staging alert firing about eviction spikes right now that nobody has looked at properly.
+
+[10:20] DEVIKA: Deployment. The auth service reads AURORIA_CLIENT_SECRET and AURORIA_TENANT_ID from the secrets manager at boot, not at request time. So a secret rotation requires a rolling restart. That has bitten us twice.
+
+[12:05] DEVIKA: The notification service depends on us. It calls our token introspection endpoint on every send. If auth is down, notifications are down. That dependency is not documented anywhere and it is not in the service catalogue.
+
+[14:30] DEVIKA: Payments also depends on us but they cache introspection results for sixty seconds, so they degrade gracefully. Notifications don't cache at all. I've been meaning to raise that with them for four months.
+
+[18:10] DEVIKA: On PKCE - the mobile clients use it, the web client doesn't, because the web client predates it. That's technical debt with no owner right now.
+
+[24:00] DEVIKA: Okay, the things I don't know.
+
+[24:10] DEVIKA: First. Who owns the token refresh mechanism during an Auroria outage? When Auroria was down in June we manually extended TTLs in Redis, but nobody decided whether that's a documented procedure or a one-time hack. It's not in the runbook.
+
+[25:30] DEVIKA: Second. Whether refresh-token rotation should apply to service accounts as well as user sessions. Service accounts currently use the same refresh flow, which I don't think anyone intended. Rotating them might break the batch jobs.
+
+[27:00] DEVIKA: Third, and this is more of a warning than a question. The rate limiter on the token endpoint is set to 100 requests per minute per client. Rotation roughly doubles the call volume on that endpoint because every refresh now also issues. That limit will need raising before you ship rotation, or you'll rate-limit your own clients.
+
+[31:45] KIRAN: What should I read before I touch any of this?
+
+[31:50] DEVIKA: RFC 6749 for the base flow, but honestly the important one is the OAuth 2.0 security best current practice document - that's where the rotation and reuse detection guidance actually lives. And the Auroria admin console docs for the tenant policy side, because you'll be the one changing those settings now.
+
+[36:20] DEVIKA: Last thing. There's an ADR requirement now for anything touching token lifetime. So this cannot just be a pull request, there has to be a written decision first.
+
+[38:40] DEVIKA: That's everything I have. The runbook is out of date in about four places - I've listed them in the handover ticket.

@@ -1,0 +1,63 @@
+{
+  "_note": "Fully synthetic persona. No real people, companies, or data.",
+  "demo_today": "2026-09-07",
+  "work_hours": {
+    "start": "09:00",
+    "end": "17:30"
+  },
+  "employee": {
+    "id": "EMP-4417",
+    "name": "Kiran Rao",
+    "pronouns": "they/them",
+    "role": "Senior Software Engineer",
+    "team": "Platform Identity",
+    "org": "Meridian Retail",
+    "tenure_months": 24,
+    "manager": "Anita Deshpande",
+    "recent_leave": {
+      "from": "2026-09-03",
+      "to": "2026-09-04",
+      "reason": "planned leave"
+    }
+  },
+  "goals": [
+    {
+      "id": "GOAL-1",
+      "text": "Take full ownership of the Helix auth service token-refresh path",
+      "horizon": "Q3 2026"
+    },
+    {
+      "id": "GOAL-2",
+      "text": "Move toward a solution architect track",
+      "horizon": "FY27"
+    }
+  ],
+  "working_preferences": {
+    "deep_work_min_block_minutes": 90,
+    "prefers_deep_work": "morning",
+    "max_deep_work_minutes_per_day": 240
+  },
+  "colleagues": [
+    {
+      "name": "Devika Suresh",
+      "role": "Former auth service owner, rotated off 2026-09-02"
+    },
+    {
+      "name": "Anita Deshpande",
+      "role": "Engineering Manager"
+    },
+    {
+      "name": "Tomas Weber",
+      "role": "Principal Architect, chairs architecture review"
+    },
+    {
+      "name": "Leena Fernandes",
+      "role": "Release manager"
+    },
+    {
+      "name": "Sam Okonkwo",
+      "role": "Security engineer"
+    }
+  ],
+  "demo_now": "09:30"
+}

@@ -1,0 +1,47 @@
+{
+  "_note": "Synthetic decision records - the substrate for 'why did we choose X' memory queries.",
+  "records": [
+    {
+      "id": "ADR-014", "date": "2026-08-18", "title": "Use Redis for the Helix session store",
+      "decision": "Session state for Helix will be held in Redis rather than PostgreSQL.",
+      "rationale": "Projected read volume at peak is approximately 40,000 requests per second against session lookups. PostgreSQL was measured at p99 latency of 34ms under a synthetic version of that load, against 3ms for Redis. Session data is ephemeral and reconstructible, so durability guarantees were not decisive.",
+      "alternatives_rejected": ["PostgreSQL - rejected on read latency under projected peak load", "In-process cache - rejected, no cross-instance consistency"],
+      "author": "Devika Suresh", "participants": ["Kiran Rao", "Devika Suresh", "Tomas Weber"],
+      "source_refs": ["CAL-101", "MSG-008"], "supersedes": null, "status": "active"
+    },
+    {
+      "id": "ADR-016", "date": "2026-09-03", "title": "Move the Helix read path to stateless JWT",
+      "decision": "Read-only endpoints will validate a stateless JWT rather than performing a session lookup.",
+      "rationale": "Removes the Redis dependency from roughly 70 percent of request volume and reduces blast radius during an IdP or Redis incident. Write paths continue to use the Redis session store from ADR-014.",
+      "alternatives_rejected": ["Keep all paths session-based - rejected, Redis becomes a single point of failure for reads"],
+      "author": "Tomas Weber", "participants": ["Tomas Weber", "Devika Suresh", "Anita Deshpande"],
+      "source_refs": ["CAL-121"], "supersedes": null, "status": "active",
+      "note": "Taken on 2026-09-03 while Kiran Rao was on leave. Kiran has not been briefed."
+    },
+    {
+      "id": "DEC-021", "date": "2026-09-04", "title": "Pull the Helix release train forward to 2026-09-11",
+      "decision": "The Helix release moves from 2026-09-18 to 2026-09-11.",
+      "rationale": "The Auroria refresh-token policy change lands on 2026-09-18. Shipping on the same day leaves no margin, so the release was pulled forward by one week.",
+      "alternatives_rejected": ["Hold at 2026-09-18 - rejected, zero contingency if the migration misbehaves"],
+      "author": "Leena Fernandes", "participants": ["Leena Fernandes", "Anita Deshpande"],
+      "source_refs": ["CAL-124", "MSG-021"], "supersedes": null, "status": "active",
+      "note": "Taken while Kiran Rao was on leave. Compresses the AUTH-247 timeline by seven days."
+    },
+    {
+      "id": "DEC-022", "date": "2026-09-04", "title": "Require an ADR for any token lifetime change",
+      "decision": "Any change to token lifetime or rotation policy requires an approved ADR before merge.",
+      "rationale": "A token lifetime change shipped without review in Q2 caused a partial outage for mobile clients.",
+      "alternatives_rejected": [],
+      "author": "Tomas Weber", "participants": ["Engineering standards group"],
+      "source_refs": ["MSG-024"], "supersedes": null, "status": "active"
+    },
+    {
+      "id": "DEC-018", "date": "2026-08-24", "title": "Migrate to Auroria refresh-token rotation before 2026-09-18",
+      "decision": "Helix will adopt refresh-token rotation to comply with the Auroria 14-day maximum lifetime.",
+      "rationale": "Auroria is reducing the maximum refresh-token lifetime from 90 days to 14 days on 2026-09-18. Without rotation, users would be forced to re-authenticate every 14 days.",
+      "alternatives_rejected": ["Request a vendor exemption - rejected, Auroria confirmed no exemptions"],
+      "author": "Sam Okonkwo", "participants": ["Kiran Rao", "Sam Okonkwo"],
+      "source_refs": ["CAL-108", "MSG-012"], "supersedes": null, "status": "active"
+    }
+  ]
+}

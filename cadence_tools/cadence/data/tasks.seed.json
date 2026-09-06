@@ -1,0 +1,101 @@
+{
+  "_note": "Synthetic task backlog for Kiran Rao. effort_minutes / deep_work / interruptibility are what make time-fit reasoning possible.",
+  "tasks": [
+    {
+      "id": "OPS-88", "title": "Approve production deployment for payments hotfix",
+      "effort_minutes": 10, "deep_work": false, "interruptibility": "high",
+      "deadline": "2026-09-07T11:00", "status": "open", "assigned_on": "2026-09-07",
+      "blocks": ["Release team (5 engineers idle until approved)"], "depends_on": [],
+      "meeting_dependency": null, "source": "Email from Leena Fernandes (MSG-030)",
+      "project": "Payments", "tags": ["approval", "blocking"]
+    },
+    {
+      "id": "AUTH-249", "title": "Write refresh-token rotation position paper for architecture review",
+      "effort_minutes": 60, "deep_work": true, "interruptibility": "low",
+      "deadline": "2026-09-07T15:00", "status": "not_started", "assigned_on": "2026-09-04",
+      "blocks": ["Architecture review CAL-133 cannot proceed without it"], "depends_on": ["TR-001", "ADR-014", "ADR-016"],
+      "meeting_dependency": "CAL-133", "source": "Jira, assigned by Tomas Weber",
+      "project": "Helix", "tags": ["writing", "architecture", "presenting"]
+    },
+    {
+      "id": "AUTH-247", "title": "Implement refresh-token rotation ahead of Auroria policy change",
+      "effort_minutes": 180, "deep_work": true, "interruptibility": "low",
+      "deadline": "2026-09-16T17:30", "status": "not_started", "assigned_on": "2026-09-04",
+      "blocks": ["Helix release train 2026-09-11"], "depends_on": ["AUTH-249"],
+      "meeting_dependency": null, "source": "Jira, assigned by Anita Deshpande while Kiran was on leave",
+      "project": "Helix", "tags": ["implementation", "critical-path"]
+    },
+    {
+      "id": "AUTH-251", "title": "Update auth service runbook following KT handover",
+      "effort_minutes": 90, "deep_work": false, "interruptibility": "high",
+      "deadline": "2026-09-10T17:30", "status": "not_started", "assigned_on": "2026-09-04",
+      "blocks": [], "depends_on": ["TR-001"],
+      "meeting_dependency": null, "source": "Jira, assigned by Anita Deshpande",
+      "project": "Helix", "tags": ["documentation", "handover"]
+    },
+    {
+      "id": "AUTH-252", "title": "Review PR #1183: token introspection endpoint",
+      "effort_minutes": 45, "deep_work": true, "interruptibility": "medium",
+      "deadline": "2026-09-09T17:30", "status": "open", "assigned_on": "2026-09-02",
+      "blocks": ["Devika Suresh cannot close out handover until merged"], "depends_on": [],
+      "meeting_dependency": null, "source": "GitHub review request",
+      "project": "Helix", "tags": ["code-review"]
+    },
+    {
+      "id": "AUTH-253", "title": "Investigate session eviction spike in staging",
+      "effort_minutes": 120, "deep_work": true, "interruptibility": "low",
+      "deadline": "2026-09-14T17:30", "status": "open", "assigned_on": "2026-09-01",
+      "blocks": [], "depends_on": [],
+      "meeting_dependency": null, "source": "Alert triage rota",
+      "project": "Helix", "tags": ["debugging"]
+    },
+    {
+      "id": "SEC-19", "title": "Respond to security questionnaire on Auroria migration",
+      "effort_minutes": 25, "deep_work": false, "interruptibility": "high",
+      "deadline": "2026-09-09T12:00", "status": "open", "assigned_on": "2026-09-04",
+      "blocks": ["Sam Okonkwo's vendor risk sign-off"], "depends_on": [],
+      "meeting_dependency": null, "source": "Email from Sam Okonkwo (MSG-026)",
+      "project": "Helix", "tags": ["compliance"]
+    },
+    {
+      "id": "AUTH-254", "title": "Write ADR for token lifetime change (new engineering standard)",
+      "effort_minutes": 75, "deep_work": true, "interruptibility": "low",
+      "deadline": "2026-09-15T17:30", "status": "not_started", "assigned_on": "2026-09-04",
+      "blocks": ["AUTH-247 cannot merge without an approved ADR"], "depends_on": ["AUTH-249"],
+      "meeting_dependency": null, "source": "Engineering standards bulletin (MSG-024)",
+      "project": "Helix", "tags": ["architecture", "governance"]
+    },
+    {
+      "id": "DOC-31", "title": "Refresh Platform Identity onboarding doc",
+      "effort_minutes": 30, "deep_work": false, "interruptibility": "high",
+      "deadline": null, "status": "open", "assigned_on": "2026-08-20",
+      "blocks": [], "depends_on": [],
+      "meeting_dependency": null, "source": "Self-assigned",
+      "project": "Team", "tags": ["documentation"]
+    },
+    {
+      "id": "OPS-91", "title": "Reply to Leena on release readiness inputs",
+      "effort_minutes": 20, "deep_work": false, "interruptibility": "high",
+      "deadline": "2026-09-08T11:00", "status": "open", "assigned_on": "2026-09-07",
+      "blocks": ["Release readiness meeting CAL-141"], "depends_on": [],
+      "meeting_dependency": "CAL-141", "source": "Email from Leena Fernandes (MSG-031)",
+      "project": "Helix", "tags": ["communication"]
+    },
+    {
+      "id": "AUTH-255", "title": "Clarify token-refresh ownership during IdP outage",
+      "effort_minutes": 20, "deep_work": false, "interruptibility": "high",
+      "deadline": null, "status": "not_started", "assigned_on": "2026-09-02",
+      "blocks": [], "depends_on": ["TR-001"],
+      "meeting_dependency": null, "source": "Open question raised in the KT session",
+      "project": "Helix", "tags": ["open-question", "handover"]
+    },
+    {
+      "id": "DOC-33", "title": "Skim new engineering standards bulletin",
+      "effort_minutes": 15, "deep_work": false, "interruptibility": "high",
+      "deadline": null, "status": "open", "assigned_on": "2026-09-04",
+      "blocks": [], "depends_on": [],
+      "meeting_dependency": null, "source": "Engineering standards bulletin (MSG-024)",
+      "project": "Team", "tags": ["reading"]
+    }
+  ]
+}

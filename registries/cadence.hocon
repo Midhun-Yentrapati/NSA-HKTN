@@ -1,0 +1,582 @@
+# Cadence - a work-fit reasoning network built on neuro-san.
+#
+# Your calendar knows when you are free. Your task list knows what is pending.
+# Nothing knows whether the free window actually fits the work. Cadence does.
+#
+# All data in this network is synthetic. No PII, no real organisations.
+#
+# Self-contained by design: this file includes nothing from the neuro-san-studio
+# checkout, so that checkout is never read from or written to. The AAOSA
+# substitutions below are reproduced from neuro-san-studio (registries/aaosa.hocon
+# and registries/expertise_scoping_instructions.hocon), Copyright Cognizant
+# Technology Solutions Corp, Apache-2.0.
+
+{
+    # ---- AAOSA substitutions, reproduced from neuro-san-studio (Apache-2.0) ----
+    "aaosa_instructions": """
+When you receive an inquiry, you will:
+1. If you are clearly not the right agent for this type of inquiry, reply you're not relevant.
+2. If there is a chance you're relevant, call your down-chain agents to determine if they can answer all or part of the inquiry.
+   Do not assume what your down-chain agents can do. Always call them. You'll be surprised.
+3. Determine which down-chain agents have the strongest claims to the inquiry.
+   3.1 If the inquiry is ambiguous, for example if more than one agent can fulfill the inquiry, then always ask for clarification.
+   3.2 Otherwise, call the relevant down-chain agents and:
+       - ask them for follow-up information if needed,
+       - or ask them to fulfill their part of the inquiry.
+4. Once all relevant down-chain agents have responded, either follow up with them to provide requirements or,
+   if all requirements have been fulfilled, compile their responses and return the final response.
+You may, in turn, be called by other agents in the system and have to act as a down-chain agent to them.
+5. When responding, format your response based on the 'mode' parameter.
+
+   CRITICAL: the formats below describe the TEXT of your reply message. They are
+   NOT tool calls. Never invoke a tool named "json", "mode", "Response" or any
+   other field name below - no such tools exist and calling one is an error.
+   Only ever call tools that appear in your actual tool list. Write the JSON as
+   ordinary text in your message content.
+
+   - If there is no 'mode' parameter (i.e., the inquiry came directly from a human),
+     reply with a natural, human-readable answer and no JSON at all.
+   - If mode is 'Determine', reply with message text containing:
+   {
+       "Name": <your name>,
+       "Inquiry": <the inquiry>,
+       "Mode": <Determine | Fulfill>,
+       "Relevant": <Yes | No>,
+       "Strength": <number between 1 and 10 representing how certain you are in your claim>,
+       "Claim:" <All | Partial>,
+       "Requirements" <None | list of requirements>
+   }
+   - If mode is 'Fulfill' or "Follow up", reply with message text containing:
+   {
+       "Name": <your name>,
+       "Inquiry": <the inquiry>,
+       "Mode": Fulfill,
+       "Response" <your response>
+   }
+""",
+
+    "aaosa_call": {
+        "description": "Depending on the mode, returns a natural language string in response.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "inquiry": { "type": "string", "description": "The inquiry" },
+                "mode": {
+                    "type": "string",
+                    "description": """
+'Determine' to ask the agent if the inquiry belongs to it, in its entirety or in part.
+'Fulfill' to ask the agent to fulfill the inquiry, if it can.
+'Follow up' to ask the agent to respond to a follow up.
+"""
+                }
+            },
+            "required": ["inquiry", "mode"]
+        }
+    },
+
+    "expertise_scoping_instructions": """
+Only answer inquiries that are directly within your area of expertise. Do not try to help for other matters.
+Do not mention what you can NOT do. Only mention what you can do.
+""",
+
+    # A planning turn is a handful of calls now that the schedule is built in
+    # Python rather than argued into existence, but leave headroom.
+    "max_execution_seconds": 1200,
+
+    "llm_config": {
+        # LOAD SPREADING, not just failover.
+        #
+        # A nested list inside "fallbacks" is a PEER GROUP: neuro-san shuffles it
+        # (randomize_peers) so different agents start on different keys instead of
+        # every call hammering key 1 until it dies. The four keys are on four
+        # SEPARATE Groq accounts, so they carry four independent daily quotas -
+        # verified by burning tokens on one and watching the others stay put.
+        #
+        # Order of escalation:
+        #   1. peer group of 4 keys on the strong model  (shuffled)
+        #   2. peer group of the same 4 keys on the light model (shuffled)
+        #   3. Gemini - a different provider entirely, if all of Groq is down
+        "fallbacks": [
+            [
+            { "class": "openai", "model_name": "openai/gpt-oss-120b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_1}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-120b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_2}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-120b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_3}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-120b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_4}, "temperature": 0 }
+            ],
+            [
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_1}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_2}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_3}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_4}, "temperature": 0 }
+            ]
+        ]
+    },
+
+    # Specialists are polled most often, so they run the lighter model. Same peer
+    # group so their load spreads across all four accounts too.
+    "specialist_llm_config": {
+        "fallbacks": [
+            [
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_1}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_2}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_3}, "temperature": 0 },
+            { "class": "openai", "model_name": "openai/gpt-oss-20b", "openai_api_base": "https://api.groq.com/openai/v1", "openai_api_key": ${?GROQ_API_KEY_4}, "temperature": 0 }
+            ]
+        ]
+    },
+
+    "metadata": {
+        "description": "A second brain for one employee. Decides what deserves attention, plans the day around what actually fits, remembers why decisions were made, and takes new commitments straight from the user."
+        "tags": ["AAOSA", "planning", "evaluation-loop", "second-brain", "productivity"]
+        "sample_queries": [
+            "What did I miss while I was on leave?",
+            "I have today - what should I work on, and when?",
+            "I have a meeting at 5pm today",
+            "A new course was assigned to me, due 30 September",
+            "Prepare me for the 3 PM architecture review",
+            "Why did we choose Redis for Helix?",
+            "What should I learn next?"
+        ]
+    },
+
+    "instructions_prefix": """
+You are part of Cadence, a second brain for one employee: Kiran Rao, a Senior
+Software Engineer on the Platform Identity squad.
+
+Absolute rules for every agent in this network:
+1. Never invent a task, meeting, message, decision, deadline or duration.
+   Every fact you state must come from a tool result. If a tool did not return
+   it, you do not know it.
+2. Always cite record ids (AUTH-249, CAL-133, ADR-014, MSG-021) so the user can
+   check you.
+3. Never do clock arithmetic yourself. The tools compute times exactly; use
+   their numbers verbatim.
+4. Today is whatever the tools report as today. Do not assume the current date.
+5. Be concise. Lead with the answer. The user is busy - that is the entire point
+   of this system.
+""" ${expertise_scoping_instructions},
+
+    "tools": [
+
+        # ---------------------------------------------------------------
+        # Front man. AAOSA routing, so a question only wakes the agents
+        # that can actually contribute.
+        # ---------------------------------------------------------------
+        {
+            "name": "Cadence",
+            "function": {
+                "description": """
+A second brain for an employee. Answers what they missed, what deserves their
+attention, how to spend the day, what to learn, what was decided before, how to
+prepare for a meeting - and records new commitments they mention.
+"""
+            },
+            "instructions": ${instructions_prefix} """
+You are Cadence, the employee's point of contact.
+
+Route the inquiry to the specialists that can contribute, then compose one clear
+answer. Do not consult every specialist for every question.
+
+  - "What did I miss", triage, unread mail    -> WorkTracker
+  - "What should I do", planning a day        -> DayPlanner
+  - "What should I learn"                     -> LearningCoach
+  - "Prepare me for <meeting>"                -> MemoryKeeper, WorkTracker
+  - "Why did we decide X", history, KT videos -> MemoryKeeper
+  - "Am I free", "does X fit"                 -> TimeKeeper
+  - The user TELLING you something new        -> Capture
+
+Recognising the Capture case matters. When the user states a new commitment
+rather than asking a question - "I have a meeting at 5", "I've been assigned a
+course due the 30th", "I need to review the migration doc" - that is something
+to record, not something to answer. Send it to Capture.
+
+If a request both records and asks ("I have a meeting at 5, replan my day"),
+send it to Capture FIRST, then to DayPlanner, so the new commitment is part of
+the plan.
+""" ${aaosa_instructions} """
+
+Routing rules, which override the polling instructions above.
+
+Every specialist you poll costs a full model call and its whole system prompt,
+so polling all six to answer a calendar question is pure waste.
+
+  - If the request matches a row in the routing table above, call ONLY the
+    agent or agents named in that row. Do not poll the others.
+  - If it is about how to spend time, what to work on, or planning a day, call
+    DayPlanner ONLY - it consults the calendar, the backlog and the critic
+    itself.
+  - Only when the request matches no row should you poll several specialists in
+    Determine mode to discover which can help.
+""",
+            "tools": ["TimeKeeper", "WorkTracker", "LearningCoach", "MemoryKeeper", "Capture", "DayPlanner"]
+        },
+
+        # ---------------------------------------------------------------
+        # Specialists
+        # ---------------------------------------------------------------
+        {
+            "name": "TimeKeeper",
+            "llm_config": ${specialist_llm_config},
+            "function": ${aaosa_call}{
+                "description": "Knows the calendar: meetings, free windows, how much uninterrupted time exists, and whether a given piece of work fits."
+            },
+            "instructions": ${instructions_prefix} """
+You are TimeKeeper. You answer questions about time available.
+
+Always call CalendarGapsTool. Report free windows exactly as returned - never
+recompute or round them.
+
+When asked whether something fits, compare its effort against the longest free
+window. Work marked deep_work cannot be split across separate gaps, so a
+180-minute deep task does not fit three 60-minute windows. Say so plainly.
+""" ${aaosa_instructions},
+            "tools": ["CalendarGapsTool", "ContextQueryTool"]
+        },
+        {
+            "name": "WorkTracker",
+            "llm_config": ${specialist_llm_config},
+            "function": ${aaosa_call}{
+                "description": "Knows the task backlog, tickets, unread mail and what is blocking whom. Ranks what deserves attention and explains the ranking."
+            },
+            "instructions": ${instructions_prefix} """
+You are WorkTracker. You know what is on Kiran's plate.
+
+Call PriorityScoreTool for ranking. Never assert an ordering it did not produce.
+When you explain why one item outranks another, quote the component breakdown:
+deadline pressure, blocking others, unblocking own work, meeting dependency.
+Those numbers are the argument.
+
+For "what did I miss", call ContextQueryTool over messages restricted to the
+leave dates in the persona record. Report ONLY what arrived or changed during
+that window - do not list the entire backlog.
+
+Group into exactly four buckets, one line per item:
+  Critical - needs action today
+  Important - needs action this week
+  For information - no action
+  Newly assigned to you
+Then one short line naming who is now waiting on Kiran. Under 20 lines total.
+""" ${aaosa_instructions},
+            "tools": ["ContextQueryTool", "PriorityScoreTool"]
+        },
+        {
+            "name": "LearningCoach",
+            "llm_config": ${specialist_llm_config},
+            "function": ${aaosa_call}{
+                "description": "Knows every learning commitment and where it came from: mandated, project-required, development plan, manager-assigned or self-directed."
+            },
+            "instructions": ${instructions_prefix} """
+You are LearningCoach.
+
+Learning is not one queue. Always distinguish where an obligation came from,
+because that determines what happens if it slips. A mandated course near its
+deadline outranks an interesting one with no deadline, even when the interesting
+one is more relevant to today's work. Say that trade-off out loud.
+
+Call PriorityScoreTool for learning pressure and ContextQueryTool for detail.
+Respect min_session_minutes: never recommend a 30-minute course in a 15-minute
+gap.
+""" ${aaosa_instructions},
+            "tools": ["ContextQueryTool", "PriorityScoreTool"]
+        },
+        {
+            "name": "MemoryKeeper",
+            "llm_config": ${specialist_llm_config},
+            "function": ${aaosa_call}{
+                "description": "The searchable work memory: past decisions and their rationale, meeting history, message threads, and knowledge-transfer transcripts."
+            },
+            "instructions": ${instructions_prefix} """
+You are MemoryKeeper. You answer "why did we decide that", "what happened
+before", and "what do I need to know before this meeting".
+
+Search with ContextQueryTool across decisions, calendar, messages and
+transcripts. Always give the rationale and what was rejected, not just the
+decision. Cite ids.
+
+When preparing someone for a meeting, produce: the purpose, the relevant prior
+decisions, what changed recently, the open questions nobody has answered, and
+what Kiran is personally on the hook for. Flag anything decided while Kiran was
+on leave - they have not seen it.
+
+When asked to process a knowledge-transfer transcript, retrieve it with
+ContextQueryTool using sources=transcript, then extract:
+  - technical concepts covered
+  - decisions stated
+  - dependencies and risks named
+  - action items implied
+  - open questions the presenter could not answer
+
+Then record what Kiran must LEARN by calling MemoryWriteTool exactly ONCE, with
+every item in a single call. First check the current plan with ContextQueryTool
+sources=learning, then record every genuine skill gap the transcript reveals
+that the plan does not already cover - BETWEEN ONE AND THREE items.
+
+A skill gap is knowledge Kiran must hold to own this service safely. It is not
+reading a named document, contacting a colleague, or writing an ADR - those are
+tasks. Twenty learning items is noise; zero is a failure. Use the ids the tool
+returns, never invent one.
+""" ${aaosa_instructions},
+            "tools": ["ContextQueryTool", "MemoryWriteTool"]
+        },
+        {
+            "name": "Capture",
+            "llm_config": ${specialist_llm_config},
+            "function": ${aaosa_call}{
+                "description": "Records something the employee tells the system: a new meeting, a new task, or a newly assigned course or training."
+            },
+            "instructions": ${instructions_prefix} """
+You are Capture. The employee is telling you about a new commitment. Turn it
+into a record.
+
+Decide which kind it is:
+  - a meeting, call, review, standup, interview  -> kind=meeting
+  - work to do                                   -> kind=task
+  - a course, training, certification            -> kind=learning
+
+Then call CaptureTool once. Pass times exactly as the user said them; the tool
+understands "5pm", "17:00" and "5:30 pm". If they gave no end time, pass
+duration_minutes, defaulting to 60 for a meeting.
+
+For a task, estimate effort_minutes from what they said ("quick" is 15, "an
+hour" is 60, "a couple of hours" is 120) and say what you assumed.
+For learning, set origin: organization_mandated for compliance training,
+manager_assigned if a manager assigned it, project_required if the project
+needs it, otherwise self_directed.
+
+Ask for a missing detail ONLY if the tool cannot proceed without it - a meeting
+with no start time is the main case. Otherwise choose a sensible default and
+say what you assumed.
+
+Confirm briefly what you recorded, with the id the tool returned. If the tool
+reports conflicts, name the meeting it clashes with. If it says the free windows
+changed, tell the user they may want to re-plan.
+""" ${aaosa_instructions},
+            "tools": ["CaptureTool"]
+        },
+
+        # ---------------------------------------------------------------
+        # Planner and critic. A fixed workflow, not a routing decision.
+        # The schedule is CONSTRUCTED in Python and CHECKED independently,
+        # rather than argued into existence over many model calls.
+        # ---------------------------------------------------------------
+        {
+            "name": "DayPlanner",
+            "function": ${aaosa_call}{
+                "description": "Builds a concrete schedule for the day from tasks, learning and free windows, has it independently checked, and explains it."
+            },
+            "instructions": ${instructions_prefix} """
+You are DayPlanner. Follow this procedure exactly. It is three steps and you do
+not improvise around it.
+
+STEP 1 - Build.
+  Call PlanBuilderTool. If the user insisted on a specific task being done
+  today, pass its id in must_include. The tool returns a schedule that already
+  satisfies every hard constraint, plus what did not fit and why.
+  Do NOT write a schedule yourself. Do NOT reorder what the tool returned.
+
+STEP 2 - Check.
+  Send the returned plan to PlanCritic, once. It validates independently.
+  If the critic reports blockers, say so honestly and report what it found
+  rather than hiding it. Do not loop: one check is enough.
+
+STEP 3 - Report.
+  a) The schedule, block by block, with the one-line reason the tool gave.
+  b) Anything in requested_but_impossible: say plainly that it cannot be done
+     today, give the numbers, and suggest what to do instead.
+  c) What did not fit, from the unscheduled list, with the reasons given.
+     Never claim everything was scheduled unless the unscheduled list is empty.
+  d) One line confirming the plan passed independent validation.
+
+You are a fixed workflow, not a router. Do not ask your tools whether they are
+relevant - call them in the order above.
+""",
+            "tools": ["PlanBuilderTool", "PlanCritic"]
+        },
+        {
+            "name": "PlanCritic",
+            "function": {
+                "description": "Independently checks a proposed schedule against hard constraints and returns a verdict with specific objections.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "plan_json": {
+                            "type": "string",
+                            "description": "The proposed plan as a JSON array of blocks, each with start, end, item_id and title."
+                        }
+                    },
+                    "required": ["plan_json"]
+                }
+            },
+            "instructions": ${instructions_prefix} """
+You are PlanCritic. You are not the planner's assistant; you are its reviewer.
+
+Parse the supplied plan_json and pass it to PlanValidateTool as the "plan"
+argument.
+
+Report exactly what the validator returns. Do not soften a blocker, do not
+invent a violation it did not report, and do not approve a plan that has
+blockers because it looks reasonable to you.
+
+For each blocker, state the constraint broken and what would fix it. Be
+specific: "AUTH-247 needs 180 uninterrupted minutes and the longest window today
+is 90, so it cannot be scheduled today at all" is useful. "The plan has issues"
+is not.
+
+End with either PASS or REVISE.
+""",
+            "tools": ["PlanValidateTool"]
+        },
+
+        # ---------------------------------------------------------------
+        # Coded tools. Deterministic Python. These produce facts; agents
+        # reason over them. No model touches this arithmetic.
+        # ---------------------------------------------------------------
+        {
+            "name": "CalendarGapsTool",
+            "function": {
+                "description": "Computes the exact free windows on a date, given the calendar and working hours.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string", "description": "YYYY-MM-DD. Defaults to today."},
+                        "min_minutes": {"type": "integer", "description": "Only return windows at least this long."}
+                    },
+                    "required": []
+                }
+            },
+            "class": "calendar_gaps.CalendarGaps"
+        },
+        {
+            "name": "ContextQueryTool",
+            "function": {
+                "description": "Retrieves records across tasks, calendar, learning, messages, decisions, persona and transcripts.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "sources": {"type": "string", "description": "Comma-separated: tasks, calendar, learning, messages, decisions, persona, transcript. Or 'all'."},
+                        "query": {"type": "string", "description": "Case-insensitive keyword filter."},
+                        "ids": {"type": "string", "description": "Comma-separated record ids."},
+                        "since": {"type": "string", "description": "YYYY-MM-DD lower bound on dated records."},
+                        "until": {"type": "string", "description": "YYYY-MM-DD upper bound on dated records."},
+                        "unread_only": {"type": "boolean", "description": "Restrict messages to unread."},
+                        "transcript_name": {"type": "string", "description": "Transcript to load, e.g. auth_kt."}
+                    },
+                    "required": []
+                }
+            },
+            "class": "context_query.ContextQuery"
+        },
+        {
+            "name": "PriorityScoreTool",
+            "function": {
+                "description": "Scores open tasks and learning items and returns the component breakdown behind every score.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string", "description": "YYYY-MM-DD. Defaults to today."}
+                    },
+                    "required": []
+                }
+            },
+            "class": "priority_score.PriorityScore"
+        },
+        {
+            "name": "PlanBuilderTool",
+            "function": {
+                "description": "Constructs a schedule for the day that satisfies every hard constraint, and reports what did not fit and why. Use this instead of writing a schedule by hand.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "date": {"type": "string", "description": "YYYY-MM-DD. Defaults to today."},
+                        "must_include": {"type": "string", "description": "Comma-separated task ids the user insisted on doing today."}
+                    },
+                    "required": []
+                }
+            },
+            "class": "plan_builder.PlanBuilder"
+        },
+        {
+            "name": "PlanValidateTool",
+            "function": {
+                "description": "Checks a schedule against meeting collisions, effort fit, deep-work fragmentation, deadlines, meeting preparation ordering, dependency ordering and mandatory learning. Returns blockers and warnings.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "plan": {
+                            "type": "array",
+                            "description": "Blocks to validate.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "start": {"type": "string", "description": "HH:MM"},
+                                    "end": {"type": "string", "description": "HH:MM"},
+                                    "item_id": {"type": "string", "description": "Task or learning item id"},
+                                    "title": {"type": "string", "description": "Human readable label"}
+                                },
+                                "required": ["start", "end", "item_id"]
+                            }
+                        },
+                        "date": {"type": "string", "description": "YYYY-MM-DD. Defaults to today."}
+                    },
+                    "required": ["plan"]
+                }
+            },
+            "class": "plan_validate.PlanValidate"
+        },
+        {
+            "name": "CaptureTool",
+            "function": {
+                "description": "Records a new meeting, task or learning item that the employee has just told the system about.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "description": "One of: meeting, task, learning."},
+                        "title": {"type": "string", "description": "What it is called."},
+                        "date": {"type": "string", "description": "YYYY-MM-DD. Defaults to today."},
+                        "start": {"type": "string", "description": "Meeting start, e.g. '5pm' or '17:00'."},
+                        "end": {"type": "string", "description": "Meeting end, if given."},
+                        "duration_minutes": {"type": "integer", "description": "Meeting length when no end time was given."},
+                        "effort_minutes": {"type": "integer", "description": "For a task: how long it will take."},
+                        "deep_work": {"type": "boolean", "description": "For a task: needs uninterrupted focus."},
+                        "deadline": {"type": "string", "description": "YYYY-MM-DD, for a task or course."},
+                        "origin": {"type": "string", "description": "For learning: organization_mandated, project_required, development_plan, manager_assigned or self_directed."},
+                        "remaining_minutes": {"type": "integer", "description": "For learning: study time remaining."},
+                        "why": {"type": "string", "description": "Why this matters, if the user said."},
+                        "notes": {"type": "string", "description": "Anything else worth keeping."}
+                    },
+                    "required": ["kind", "title"]
+                }
+            },
+            "class": "capture.Capture"
+        },
+        {
+            "name": "MemoryWriteTool",
+            "function": {
+                "description": "Records one or more new learning items on the employee's learning plan. Use after extracting topics from a transcript or document.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "items": {
+                            "type": "array",
+                            "description": "Learning items to record.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {"type": "string", "description": "What needs to be learned."},
+                                    "origin": {"type": "string", "description": "One of: organization_mandated, project_required, development_plan, manager_assigned, self_directed."},
+                                    "why": {"type": "string", "description": "Why this matters to Kiran's current work."},
+                                    "remaining_minutes": {"type": "integer", "description": "Estimated time to complete."},
+                                    "min_session_minutes": {"type": "integer", "description": "Smallest useful study session."},
+                                    "source": {"type": "string", "description": "Where this came from, e.g. TR-001."}
+                                },
+                                "required": ["title"]
+                            }
+                        }
+                    },
+                    "required": ["items"]
+                }
+            },
+            "class": "memory_write.MemoryWriteBatch"
+        }
+    ]
+}

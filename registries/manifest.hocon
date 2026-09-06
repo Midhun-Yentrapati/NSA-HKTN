@@ -1,0 +1,6 @@
+# Cadence agent network manifest.
+# Pointed at by AGENT_MANIFEST_FILE so nothing needs to be written into the
+# neuro-san-studio checkout.
+{
+    "cadence.hocon": true
+}
