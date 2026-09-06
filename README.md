@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Cadence
 
 **A work-fit reasoning system built on Cognizant's Neuro AI Multi-Agent Accelerator (neuro-san).**
@@ -574,3 +575,7 @@ reproduced from that project under Apache-2.0 with attribution.
 All scenario data — people, company, projects, messages, decisions and the
 knowledge-transfer transcript — is fabricated for demonstration. Any resemblance
 to real individuals or organisations is coincidental.
+=======
+# NSA-HKTN
+Neuro San AI Hackathon- Cadence
+>>>>>>> e85c639400a70bdc14e52a8bcf26fc092e5a2605
