@@ -30,7 +30,28 @@ def main() -> int:
     for name in missing:
         print(f"  WARNING: no seed for {name}")
     print("Demo state is clean." if restored else "Nothing restored.")
+
+    if _server_running():
+        print()
+        print("  !! A server is still running on port 8080 or 4173.")
+        print("     It holds the old data in memory and will write it back over")
+        print("     these files on its next save. Stop the server, run this again,")
+        print("     then start it. Order matters.")
+        return 1
+
     return 0 if restored else 1
+
+
+def _server_running() -> bool:
+    """Best-effort check for a live neuro-san on the default ports."""
+    import socket
+
+    for port in (8080, 4173):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.settimeout(0.3)
+            if probe.connect_ex(("127.0.0.1", port)) == 0:
+                return True
+    return False
 
 
 if __name__ == "__main__":
